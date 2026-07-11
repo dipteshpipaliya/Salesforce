@@ -34,6 +34,21 @@ pipeline {
         }
     }
 }
+stage('Authenticate Dev Hub') {
+    steps {
+        // Securely inject the server.key file from Jenkins credential manager
+        withCredentials([file(credentialsId: 'sf-jwt-key', variable: 'TEMP_JWT_KEY')]) {
+            script {
+                // 1. Copy the key file immediately to your active workspace directory
+                // This prevents Jenkins from deleting it when this block closes
+                sh "cp ${TEMP_JWT_KEY} ./server.key"
+                
+                // 2. Perform the login pointing to the permanent workspace copy
+                sh "sf org login jwt --client-id ${SF_CLIENT_ID} --jwt-key-file ./server.key --username ${SF_USERNAME} --instance-url ${INSTANCE_URL} --set-default-dev-hub"
+            }
+        }
+    }
+}
         
         stage('Authorize Salesforce') {
             steps {
