@@ -57,6 +57,7 @@ pipeline {
                     script {
                         bat 'copy "%TEMP_JWT_KEY%" .\\server.key'
                         bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default-dev-hub'
+                   bat 'sf config set org-capitalize-record-types=true'
                     }
                 }
             }
