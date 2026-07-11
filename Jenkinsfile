@@ -5,7 +5,7 @@ pipeline {
         // Your Salesforce External Client App Consumer Key
         CLIENT_ID = '3MVG9HtWXcDGV.nF1F54zosIcUnMSWJp9xSdbqaBrNGYZubtCWhH01rXAU9ONF8VDPG3OnegbyleaujfT2YER'
         // Your Salesforce deployment user email
-        SF_USERNAME = 'orgfarm-51d7ed45cf-dev-ed.develop.my.salesforce.com'
+        SF_USERNAME = 'dipteshpipaliya.9e05d8f66461@agentforce.com'
         // Use https://test.salesforce.com for Sandbox, login.salesforce.com for Prod
         INSTANCE_URL = 'https://orgfarm-51d7ed45cf-dev-ed.develop.my.salesforce.com/' 
     }
