@@ -9,8 +9,6 @@ pipeline {
     }
     
     stages {
-
-      stages {
         stage('Checkout Code & PR Refs') {
             steps {
                 script {
@@ -53,9 +51,9 @@ pipeline {
                 }
             }
         }
-     stage('Authenticate Dev Hub') {
+        
+        stage('Authenticate Dev Hub') {
             steps {
-                // Changed 'sf-jwt-key' to 'salesforce-jwt-key'
                 withCredentials([file(credentialsId: 'salesforce-jwt-key', variable: 'TEMP_JWT_KEY')]) {
                     script {
                         bat 'copy "%TEMP_JWT_KEY%" .\\server.key'
@@ -73,8 +71,8 @@ pipeline {
 
         stage('Deploy & Test to Scratch Org') {
             steps {
-                // Reading environment mapping using Windows variable conventions
-                bat 'sf project deploy start --test-level RunSpecifiedTests --tests "%RUN_THESE_TESTS%"'
+                // FIXED: Now correctly executes using the dynamic bypass/specified-test environment flags
+                bat 'sf project deploy start %SF_DEPLOY_FLAGS%'
             }
         }
     }
