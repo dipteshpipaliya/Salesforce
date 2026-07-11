@@ -8,12 +8,12 @@ pipeline {
     }
     
     stages {
-        stage('Checkout Code & PR Refs') {
+        stage('Checkout Code') {
             steps {
                 script {
                     checkout scm
-                    echo "Safely fetching open Pull Requests from GitHub..."
-                    bat 'git fetch origin +refs/pull/*:refs/remotes/origin/pr/*'
+                    echo "Current Execution Branch: ${env.BRANCH_NAME}"
+                    echo "Pull Request ID (if applicable): ${env.CHANGE_ID}"
                 }
             }
         }
@@ -21,31 +21,37 @@ pipeline {
         stage('Extract Tests & Generate Delta') {
             steps {
                 script {
-                    echo "Checking PR commit history for Apex Test assignments..."
+                    echo "Generating Delta deployment payload based on Git history..."
                     
-                    def commitLog = bat(script: '@echo off\ngit log origin/main..HEAD --pretty=%%B', returnStdout: true).trim()
-                    
-                    echo "--- DEBUG INFO ---"
-                    echo "PR Commit History scanned:\n${commitLog}"
-                    echo "------------------"
-                    
-                    // FIXED: Call the @NonCPS helper function to avoid serialization errors
-                    def targetTests = parseApexTests(commitLog)
-                    
-                    if (targetTests != null) {
-                        env.SF_TEST_FLAGS = "--test-level RunSpecifiedTests --tests \"${targetTests}\""
-                        echo "Parsed Apex Tests: ${targetTests}"
-                    } else {
-                        env.SF_TEST_FLAGS = "--test-level NoTestRun"
-                        echo "No explicit tests found. Defaulting to NoTestRun strategy."
-                    }
-                    
-                    echo "Generating Delta deployment payload..."
                     bat 'if exist changed-sources rmdir /s /q changed-sources'
                     bat 'mkdir changed-sources'
-                    bat 'sfdx sgd:gen --to HEAD --from origin/main --output changed-sources/ --source force-app/'
                     
-                    echo "--- DELTA MANIFEST GENERATED ---"
+                    // Direct target evaluation based on whether it is an open PR or main branch
+                    if (env.CHANGE_ID) {
+                        echo "Validating Pull Request! Analyzing changes against origin/main..."
+                        
+                        // Parse commit text for target test names
+                        def commitLog = bat(script: '@echo off\ngit log origin/main..HEAD --pretty=%%B', returnStdout: true).trim()
+                        def targetTests = parseApexTests(commitLog)
+                        
+                        if (targetTests != null) {
+                            env.SF_TEST_FLAGS = "--test-level RunSpecifiedTests --tests \"${targetTests}\""
+                        } else {
+                            env.SF_TEST_FLAGS = "--test-level NoTestRun"
+                        }
+                        
+                        // Build validation package comparison
+                        bat 'sfdx sgd:gen --to HEAD --from origin/main --output changed-sources/ --source force-app/'
+                        env.SF_EXECUTION_MODE = "VALIDATE"
+                    } else {
+                        echo "Executing Main Merge Deployment! Processing full package rules..."
+                        
+                        // When merged into main, deploy the full target package with regular test strategies
+                        env.SF_TEST_FLAGS = "--test-level NoTestRun" 
+                        env.SF_EXECUTION_MODE = "DEPLOY"
+                    }
+                    
+                    echo "--- MANIFEST CONTENT ---"
                     bat 'if exist changed-sources\\package\\package.xml type changed-sources\\package\\package.xml'
                 }
             }
@@ -63,11 +69,16 @@ pipeline {
             }
         }
 
-        stage('Validate Delta Changes (PR Check)') {
+        stage('Execute Salesforce Action') {
             steps {
                 script {
-                    echo "Executing Delta PR Validation via Dry Run..."
-                    bat 'sf project deploy start --manifest changed-sources/package/package.xml %SF_TEST_FLAGS% --dry-run'
+                    if (env.SF_EXECUTION_MODE == "VALIDATE") {
+                        echo "Running PR Check: Delta Validation (--dry-run mode)"
+                        bat 'sf project deploy start --manifest changed-sources/package/package.xml %SF_TEST_FLAGS% --dry-run'
+                    } else {
+                        echo "Running Merge Action: Full Deploy to Sandbox Org"
+                        bat 'sf project deploy start --source-dir force-app/ %SF_TEST_FLAGS%'
+                    }
                 }
             }
         }
@@ -83,8 +94,6 @@ pipeline {
     }
 }
 
-// FIXED: Added @NonCPS annotation. This tells Jenkins NOT to try and serialize 
-// any variables used inside this function, preventing the Matcher exception.
 @NonCPS
 def parseApexTests(String commitLog) {
     def matcher = (commitLog =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
