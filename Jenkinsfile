@@ -9,17 +9,16 @@ pipeline {
     }
     
     stages {
-        stage('Checkout Code & PR Refs') {
+       stage('Checkout Code & PR Refs') {
             steps {
                 script {
+                    // Standard checkout first
                     checkout scm
                     
-                    echo "Configuring Git to see open Pull Requests..."
-                    bat 'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"'
-                    bat 'git config --add remote.origin.fetch "+refs/pull/*:refs/remotes/origin/pr/*"'
+                    echo "Safely fetching open Pull Requests from GitHub..."
                     
-                    echo "Fetching latest changes from GitHub..."
-                    bat 'git fetch origin'
+                    // Force-fetches the hidden PR references directly without breaking your local git config file
+                    bat 'git fetch origin +refs/pull/*:refs/remotes/origin/pr/*'
                 }
             }
         }
