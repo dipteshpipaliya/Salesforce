@@ -39,11 +39,12 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'sf-jwt-key', variable: 'TEMP_JWT_KEY')]) {
                     script {
-                        // Copy the file to a stable local path
-                        sh "cp ${TEMP_JWT_KEY} ./server.key"
+                        // Windows uses 'copy' instead of 'cp'
+                        // Enclosing variables in quotes handles spaces in Windows paths safely
+                        bat 'copy "%TEMP_JWT_KEY%" .\\server.key'
                         
-                        // Clean login that only targets this specific user session
-                        sh "sf org login jwt --client-id ${CLIENT_ID} --jwt-key-file ./server.key --username ${SF_USERNAME} --instance-url ${INSTANCE_URL} --set-default-dev-hub"
+                        // Execute Salesforce login using Windows batch syntax
+                        bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default-dev-hub'
                     }
                 }
             }
@@ -51,13 +52,13 @@ pipeline {
 
         stage('Provision Scratch Org') {
             steps {
-                sh "sf org create scratch --definition-file config/project-scratch-def.json --alias ${SCRATCH_ALIAS} --set-default --duration-days 1"
+                bat 'sf org create scratch --definition-file config/project-scratch-def.json --alias "%SCRATCH_ALIAS%" --set-default --duration-days 1'
             }
         }
 
         stage('Deploy & Test to Scratch Org') {
             steps {
-                sh "sf project deploy start --test-level RunSpecifiedTests --tests ${EXTRACTED_TESTS}"
+                bat 'sf project deploy start --test-level RunSpecifiedTests --tests "%EXTRACTED_TESTS%"'
             }
         }
     }
@@ -65,8 +66,8 @@ pipeline {
     post {
         always {
             script {
-                // Clean up local certificate copies to maintain security workspace hygiene
-                sh "rm -f ./server.key"
+                // Windows uses 'del' instead of 'rm -f'
+                bat 'if exist .\\server.key del /f /q .\\server.key'
             }
         }
     }
