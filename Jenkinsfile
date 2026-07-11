@@ -4,43 +4,32 @@ pipeline {
     environment {
         CLIENT_ID = '3MVG9HtWXcDGV.nF1F54zosIcUnMSWJp9xSdbqaBrNGYZubtCWhH01rXAU9ONF8VDPG3OnegbyleaujfT2YER'
         SF_USERNAME = 'dipteshpipaliya.9e05d8f66461@agentforce.com'
+        
+        // 1. Change this to match your target environment (e.g., https://test.salesforce.com for Sandboxes)
         INSTANCE_URL = 'https://orgfarm-51d7ed45cf-dev-ed.develop.my.salesforce.com' 
-        SCRATCH_ALIAS = 'ScratchOrg_PR'
     }
     
     stages {
-       stage('Checkout Code & PR Refs') {
+        stage('Checkout Code & PR Refs') {
             steps {
                 script {
-                    // Standard checkout first
                     checkout scm
-                    
                     echo "Safely fetching open Pull Requests from GitHub..."
-                    
-                    // Force-fetches the hidden PR references directly without breaking your local git config file
                     bat 'git fetch origin +refs/pull/*:refs/remotes/origin/pr/*'
                 }
             }
         }
         
-     stage('Extract Tests from PR') {
+        stage('Extract Tests from PR') {
             steps {
                 script {
                     echo "Checking PR commit history for Apex Test assignments..."
-                    
-                    // FIXED: Escaped the % character for Windows Batch processing using %%B
                     def commitLog = bat(script: 'git log origin/main..HEAD --pretty=%%B', returnStdout: true).trim()
                     
-                    echo "--- DEBUG INFO ---"
-                    echo "PR Commit History scanned:\n${commitLog}"
-                    echo "------------------"
-                    
-                    // Look for the "Apex Tests [ClassName]" pattern
                     def matcher = (commitLog =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
                     
                     if (matcher.find()) {
                         def targetTests = matcher[0][1].trim().replaceAll("[\\s\\r\\n]+", "")
-                        
                         env.SF_DEPLOY_FLAGS = "--test-level RunSpecifiedTests --tests \"${targetTests}\""
                         echo "Successfully parsed Apex Tests from PR Commit. Running: ${targetTests}"
                     } else {
@@ -51,27 +40,25 @@ pipeline {
             }
         }
         
-        stage('Authenticate Dev Hub') {
+        stage('Authenticate Target Org') {
             steps {
                 withCredentials([file(credentialsId: 'salesforce-jwt-key', variable: 'TEMP_JWT_KEY')]) {
                     script {
                         bat 'copy "%TEMP_JWT_KEY%" .\\server.key'
-                        bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default-dev-hub'
-                   bat 'sf config set org-capitalize-record-types=true'
+                        
+                        // 2. Logs directly into your target sandbox or environment instead of a Dev Hub
+                        bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default'
+                        bat 'sf config set org-capitalize-record-types=true'
                     }
                 }
             }
         }
 
-        stage('Provision Scratch Org') {
-            steps {
-                bat 'sf org create scratch --definition-file config/project-scratch-def.json --alias "%SCRATCH_ALIAS%" --set-default --duration-days 1'
-            }
-        }
+        // REMOVED: Provision Scratch Org Stage is completely gone!
 
-        stage('Deploy & Test to Scratch Org') {
+        stage('Deploy & Test to Target Org') {
             steps {
-                // FIXED: Now correctly executes using the dynamic bypass/specified-test environment flags
+                // 3. Deploys straight to the authenticated default environment
                 bat 'sf project deploy start %SF_DEPLOY_FLAGS%'
             }
         }
@@ -80,7 +67,6 @@ pipeline {
     post {
         always {
             script {
-                // Ensure transient authentication file cleanup occurs properly
                 bat 'if exist .\\server.key del /f /q .\\server.key'
             }
         }
