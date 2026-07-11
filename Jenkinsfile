@@ -7,7 +7,7 @@ pipeline {
         // Your Salesforce deployment user email
         SF_USERNAME = 'orgfarm-51d7ed45cf-dev-ed.develop.my.salesforce.com'
         // Use https://test.salesforce.com for Sandbox, login.salesforce.com for Prod
-        INSTANCE_URL = 'https://login.salesforce.com/' 
+        INSTANCE_URL = 'https://orgfarm-51d7ed45cf-dev-ed.develop.my.salesforce.com/' 
     }
     
     stages {
