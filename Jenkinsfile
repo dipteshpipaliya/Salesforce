@@ -17,29 +17,23 @@ pipeline {
             }
         }
         
-        stage('Extract Tests from PR') {
-            steps {
-                script {
-                    // Fetch the PR Description from Jenkins environment variables
-                    // Note: CHANGE 'CHANGE_URL' or 'CHANGE_BODY' depending on your Git plugin settings
-                    def prBody = env.CHANGE_BODY ?: ""
-                    
-                    echo "Scanning Pull Request Description..."
-                    
-                    // Regex looks for "## Apex Tests" followed by the class names
-                    def matcher = (prBody =~ /(?i)## Apex Tests\s*\r?\n\s*([a-zA-Z0-9_,\s]+)/)
-                    
-                    if (matcher.find()) {
-                        EXTRACTED_TESTS = matcher[0][1].trim().replaceAll("\\s+", "")
-                        echo "Found target Apex Tests in PR: ${EXTRACTED_TESTS}"
-                    } else {
-                        // Fallback default test if no match is found to avoid breaking the build completely
-                        EXTRACTED_TESTS = 'ContactServiceTest'
-                        echo "No Apex Tests declared in PR body. Using fallback: ${EXTRACTED_TESTS}"
-                    }
-                }
+    stage('Extract Tests from PR') {
+    steps {
+        script {
+            // Read the webhook variable directly
+            def prBody = env.PR_BODY ?: ""
+            echo "Scanning PR Description from Webhook Payload..."
+            
+            def matcher = (prBody =~ /(?i)## Apex Tests\s*\r?\n\s*([a-zA-Z0-9_,\s]+)/)
+            if (matcher.find()) {
+                EXTRACTED_TESTS = matcher[0][1].trim().replaceAll("\\s+", "")
+            } else {
+                EXTRACTED_TESTS = 'ContactServiceTest'
             }
+            echo "Tests to run: ${EXTRACTED_TESTS}"
         }
+    }
+}
         
         stage('Authorize Salesforce') {
             steps {
