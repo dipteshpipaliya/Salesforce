@@ -15,7 +15,7 @@ public with sharing class ContactService {
         for (Contact con : contactList) {
             // Check if the standard Description field is blank
             if (String.isBlank(con.Description)) {
-                con.Description = 'Default description populated via Apex ContactService.';
+                con.Description = 'Default description populated via Apex ContactServicsaaas.';
                 contactsToUpdate.add(con);
             }
         }
