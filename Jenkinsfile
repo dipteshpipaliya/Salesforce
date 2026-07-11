@@ -36,19 +36,37 @@ pipeline {
 }
 stage('Authenticate Dev Hub') {
     steps {
-        // Securely inject the server.key file from Jenkins credential manager
+        script {
+            // 1. Force the CLI to throw away all old cached, broken paths from previous runs
+            sh "sf org logout --all --no-prompt || true"
+        }
+        
+        // 2. Now handle the fresh credentials safely
         withCredentials([file(credentialsId: 'sf-jwt-key', variable: 'TEMP_JWT_KEY')]) {
             script {
-                // 1. Copy the key file immediately to your active workspace directory
-                // This prevents Jenkins from deleting it when this block closes
+                // Copy the file to a static place that never changes name
                 sh "cp ${TEMP_JWT_KEY} ./server.key"
                 
-                // 2. Perform the login pointing to the permanent workspace copy
+                // Login using the clean local path
                 sh "sf org login jwt --client-id ${SF_CLIENT_ID} --jwt-key-file ./server.key --username ${SF_USERNAME} --instance-url ${INSTANCE_URL} --set-default-dev-hub"
             }
         }
     }
 }
+stage('Provision Scratch Org') {
+    steps {
+        // Explicitly tie the key to the scratch org generation block
+        sh "sf org create scratch --definition-file config/project-scratch-def.json --alias ${SCRATCH_ALIAS} --set-default --duration-days 1 --jwt-key-file ./server.key"
+    }
+}
+
+stage('Deploy & Validate Code') {
+    steps {
+        // Force the deploy process to validate against your local key copy
+        sh "sf project deploy start --jwt-key-file ./server.key"
+    }
+}
+
         
         stage('Authorize Salesforce') {
             steps {
