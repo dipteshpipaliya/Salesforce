@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>Contact_Name_Change_Not_Allowed</fullName>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>Contact Name Change Not Allowed</shortDescription>
+        <value>Contact name cannot be changed once it has been set.</value>
+    </labels>
+</CustomLabels>
