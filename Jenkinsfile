@@ -15,25 +15,31 @@ pipeline {
             }
         }
         
-        stage('Extract Tests from PR') {
+  stage('Extract Tests from PR') {
             steps {
                 script {
                     def prBody = env.PR_BODY ?: ""
                     echo "Scanning PR Description from Webhook Payload..."
                     
-                    // Fallback test class if regex misses
+                    // Default fallback test class if parsing fails completely
                     def targetTests = 'ContactServiceTest'
                     
-                    // Upgraded regex: Matches "Apex Tests" followed by newline/spaces and text list
-                    def matcher = (prBody =~ /(?i)Apex\s*Tests\s*\r?\n\s*([a-zA-Z0-9_,\s]+)/)
+                    // 1. Clean the string to remove markdown characters like '#' that can break regex bounds
+                    def cleanBody = prBody.replaceAll("#", "").trim()
+                    
+                    // 2. REGEX: Look for "Apex Tests" followed by optional spaces, brackets, and alphanumeric text
+                    // Matches: Apex Tests [test1,test2] OR Apex Tests test1,test2
+                    def matcher = (cleanBody =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
+                    
                     if (matcher.find()) {
+                        // Strip out all whitespace, newlines, and carriage returns completely
                         targetTests = matcher[0][1].trim().replaceAll("[\\s\\r\\n]+", "")
-                        echo "Found target Apex Tests in PR: ${targetTests}"
+                        echo "Successfully parsed Apex Tests from PR: ${targetTests}"
                     } else {
-                        echo "No Apex Tests declared in PR body. Using fallback: ${targetTests}"
+                        echo "Regex pattern match failed. PR body didn't match format."
+                        echo "Using fallback execution: ${targetTests}"
                     }
                     
-                    // Injecting safely into pipeline environment mapping
                     env.RUN_THESE_TESTS = targetTests
                 }
             }
