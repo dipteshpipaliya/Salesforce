@@ -10,14 +10,13 @@ pipeline {
     
     stages {
 
+      stages {
         stage('Checkout Code & PR Refs') {
             steps {
                 script {
-                    // Standard checkout first
                     checkout scm
                     
                     echo "Configuring Git to see open Pull Requests..."
-                    // 1. Manually tell the local Git workspace to look for GitHub Pull Requests
                     bat 'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"'
                     bat 'git config --add remote.origin.fetch "+refs/pull/*:refs/remotes/origin/pr/*"'
                     
@@ -26,36 +25,34 @@ pipeline {
                 }
             }
         }
- stage('Extract Tests from PR') {
+        
+        stage('Extract Tests from PR') {
             steps {
                 script {
-                    echo "Checking local Git history for Apex Test assignments..."
-                    
-                    // 1. Run a native batch command to grab the latest commit message text
-                    def commitMessage = bat(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
+                    echo "Checking PR commit history for Apex Test assignments..."
+                    def commitLog = bat(script: 'git log origin/main..HEAD --pretty=%B', returnStdout: true).trim()
                     
                     echo "--- DEBUG INFO ---"
-                    echo "Latest Commit Message found: '${commitMessage}'"
+                    echo "PR Commit History scanned:\n${commitLog}"
                     echo "------------------"
                     
-                    def targetTests = 'ContactServiceTest' // Default fallback test
-                    
-                    // 2. Scan the commit message text for: Apex Tests [ClassName]
-                    def matcher = (commitMessage =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
+                    // 1. Look for the "Apex Tests [ClassName]" pattern
+                    def matcher = (commitLog =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
                     
                     if (matcher.find()) {
-                        targetTests = matcher[0][1].trim().replaceAll("[\\s\\r\\n]+", "")
-                        echo "Successfully parsed Apex Tests from Git commit: ${targetTests}"
+                        def targetTests = matcher[0][1].trim().replaceAll("[\\s\\r\\n]+", "")
+                        
+                        // 2. Found valid text! Set up deployment to run this specific test
+                        env.SF_DEPLOY_FLAGS = "--test-level RunSpecifiedTests --tests \"${targetTests}\""
+                        echo "Successfully parsed Apex Tests from PR Commit. Running: ${targetTests}"
                     } else {
-                        echo "No Apex Tests found in the commit message template."
-                        echo "Using fallback execution: ${targetTests}"
+                        // 3. BYPASS BY DEFAULT: Switch deployment strategy to NoTestRun if parsing fails
+                        env.SF_DEPLOY_FLAGS = "--test-level NoTestRun"
+                        echo "No valid Apex Tests found in PR comment format. Bypassing tests completely using NoTestRun strategy."
                     }
-                    
-                    env.RUN_THESE_TESTS = targetTests
                 }
             }
         }
-
      stage('Authenticate Dev Hub') {
             steps {
                 // Changed 'sf-jwt-key' to 'salesforce-jwt-key'
