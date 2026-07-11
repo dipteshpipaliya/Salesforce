@@ -15,28 +15,28 @@ pipeline {
             }
         }
         
-  stage('Extract Tests from PR') {
+ stage('Extract Tests from PR') {
             steps {
                 script {
-                    def prBody = env.PR_BODY ?: ""
-                    echo "Scanning PR Description from Webhook Payload..."
+                    echo "Checking local Git history for Apex Test assignments..."
                     
-                    // Default fallback test class if parsing fails completely
-                    def targetTests = 'ContactServiceTest'
+                    // 1. Run a native batch command to grab the latest commit message text
+                    def commitMessage = bat(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
                     
-                    // 1. Clean the string to remove markdown characters like '#' that can break regex bounds
-                    def cleanBody = prBody.replaceAll("#", "").trim()
+                    echo "--- DEBUG INFO ---"
+                    echo "Latest Commit Message found: '${commitMessage}'"
+                    echo "------------------"
                     
-                    // 2. REGEX: Look for "Apex Tests" followed by optional spaces, brackets, and alphanumeric text
-                    // Matches: Apex Tests [test1,test2] OR Apex Tests test1,test2
-                    def matcher = (cleanBody =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
+                    def targetTests = 'ContactServiceTest' // Default fallback test
+                    
+                    // 2. Scan the commit message text for: Apex Tests [ClassName]
+                    def matcher = (commitMessage =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
                     
                     if (matcher.find()) {
-                        // Strip out all whitespace, newlines, and carriage returns completely
                         targetTests = matcher[0][1].trim().replaceAll("[\\s\\r\\n]+", "")
-                        echo "Successfully parsed Apex Tests from PR: ${targetTests}"
+                        echo "Successfully parsed Apex Tests from Git commit: ${targetTests}"
                     } else {
-                        echo "Regex pattern match failed. PR body didn't match format."
+                        echo "No Apex Tests found in the commit message template."
                         echo "Using fallback execution: ${targetTests}"
                     }
                     
@@ -45,11 +45,11 @@ pipeline {
             }
         }
 
-        stage('Authenticate Dev Hub') {
+     stage('Authenticate Dev Hub') {
             steps {
-                withCredentials([file(credentialsId: 'sf-jwt-key', variable: 'TEMP_JWT_KEY')]) {
+                // Changed 'sf-jwt-key' to 'salesforce-jwt-key'
+                withCredentials([file(credentialsId: 'salesforce-jwt-key', variable: 'TEMP_JWT_KEY')]) {
                     script {
-                        // Safe clean file copying syntax for Windows environments
                         bat 'copy "%TEMP_JWT_KEY%" .\\server.key'
                         bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default-dev-hub'
                     }
