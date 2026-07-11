@@ -22,7 +22,13 @@ pipeline {
             steps {
                 script {
                     echo "Checking PR commit history for Apex Test assignments..."
-                    def commitLog = bat(script: 'git log origin/main..HEAD --pretty=%%B', returnStdout: true).trim()
+                    
+                    // FIXED: Added @echo off to prevent Windows from printing the command itself into the output variable
+                    def commitLog = bat(script: '@echo off\ngit log origin/main..HEAD --pretty=%%B', returnStdout: true).trim()
+                    
+                    echo "--- DEBUG INFO ---"
+                    echo "PR Commit History scanned:\n${commitLog}"
+                    echo "------------------"
                     
                     // 1. Determine test level settings based on PR commit messages
                     def matcher = (commitLog =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
@@ -36,13 +42,14 @@ pipeline {
                     }
                     
                     echo "Generating Delta deployment payload..."
-                    // 2. Create a specific 'changed-sources' directory holding only modified files
+                    // 2. Clean target directories first to ensure isolated builds
+                    bat 'if exist changed-sources rmdir /s /q changed-sources'
                     bat 'mkdir changed-sources'
                     bat 'sfdx sgd:gen --to HEAD --from origin/main --output changed-sources/ --source force-app/'
                     
                     // Show generated files in logs for tracking
                     echo "--- DELTA MANIFEST GENERATED ---"
-                    bat 'type changed-sources\\package\\package.xml'
+                    bat 'if exist changed-sources\\package\\package.xml type changed-sources\\package\\package.xml'
                 }
             }
         }
