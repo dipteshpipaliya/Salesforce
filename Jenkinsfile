@@ -23,27 +23,27 @@ pipeline {
             }
         }
         
-        stage('Extract Tests from PR') {
+     stage('Extract Tests from PR') {
             steps {
                 script {
                     echo "Checking PR commit history for Apex Test assignments..."
-                    def commitLog = bat(script: 'git log origin/main..HEAD --pretty=%B', returnStdout: true).trim()
+                    
+                    // FIXED: Escaped the % character for Windows Batch processing using %%B
+                    def commitLog = bat(script: 'git log origin/main..HEAD --pretty=%%B', returnStdout: true).trim()
                     
                     echo "--- DEBUG INFO ---"
                     echo "PR Commit History scanned:\n${commitLog}"
                     echo "------------------"
                     
-                    // 1. Look for the "Apex Tests [ClassName]" pattern
+                    // Look for the "Apex Tests [ClassName]" pattern
                     def matcher = (commitLog =~ /(?i)Apex\s*Tests\s*\[?([a-zA-Z0-9_,\s]+)\]?/)
                     
                     if (matcher.find()) {
                         def targetTests = matcher[0][1].trim().replaceAll("[\\s\\r\\n]+", "")
                         
-                        // 2. Found valid text! Set up deployment to run this specific test
                         env.SF_DEPLOY_FLAGS = "--test-level RunSpecifiedTests --tests \"${targetTests}\""
                         echo "Successfully parsed Apex Tests from PR Commit. Running: ${targetTests}"
                     } else {
-                        // 3. BYPASS BY DEFAULT: Switch deployment strategy to NoTestRun if parsing fails
                         env.SF_DEPLOY_FLAGS = "--test-level NoTestRun"
                         echo "No valid Apex Tests found in PR comment format. Bypassing tests completely using NoTestRun strategy."
                     }
