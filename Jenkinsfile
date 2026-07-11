@@ -18,19 +18,28 @@ pipeline {
             }
         }
         
-        stage('Extract Tests from PR') {
+      stage('Extract Tests from PR') {
             steps {
                 script {
+                    // 1. Properly pull the payload body safely using 'def'
                     def prBody = env.PR_BODY ?: ""
                     echo "Scanning PR Description from Webhook Payload..."
                     
+                    // 2. Use a local variable to hold the extracted string
+                    def targetTests = '' // Default fallback test
+                    
+                    // Regex matches "## Apex Tests" followed by a newline and the test class names
                     def matcher = (prBody =~ /(?i)## Apex Tests\s*\r?\n\s*([a-zA-Z0-9_,\s]+)/)
+                    
                     if (matcher.find()) {
-                        EXTRACTED_TESTS = matcher[0][1].trim().replaceAll("\\s+", "")
+                        targetTests = matcher[0][1].trim().replaceAll("\\s+", "")
+                        echo "Found target Apex Tests in PR: ${targetTests}"
                     } else {
-                        EXTRACTED_TESTS = 'ContactServiceTest'
+                        echo "No Apex Tests declared in PR body. Using fallback: ${targetTests}"
                     }
-                    echo "Tests to run: ${EXTRACTED_TESTS}"
+                    
+                    // 3. Inject it into the environment scope safely so the next stage can see it
+                    env.RUN_THESE_TESTS = targetTests
                 }
             }
         }
