@@ -22,7 +22,7 @@ pipeline {
             steps {
                 // Retrieves the secret server.key file you uploaded to Jenkins Credentials
                 withCredentials([file(credentialsId: 'salesforce-jwt-key', variable: 'JWT_KEY_FILE')]) {
-                    sh '''
+                    bat '''
                         sf org login jwt \
                             --client-id ${CLIENT_ID} \
                             --jwt-key-file ${JWT_KEY_FILE} \
@@ -37,7 +37,7 @@ pipeline {
         stage('Deploy to Salesforce') {
             steps {
                 // Deploys the metadata source code to your target Salesforce Org
-                sh 'sf project deploy start'
+                bat 'sf project deploy start'
             }
         }
     }
