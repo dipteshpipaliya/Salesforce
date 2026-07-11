@@ -8,7 +8,7 @@ public with sharing class ContactTriggerHandler {
     /**
      * Entry point called by ContactTrigger on before update.
      *
-     * @param newContacts  List of Contact records with incoming field values. //aa
+     * @param newContacts  List of Contact records with incoming field values. //aaaaa
      * @param oldMap       Map of Contact Id to the prior state of each record.
      */
     public static void handle(List<Contact> newContacts, Map<Id, Contact> oldMap) {
