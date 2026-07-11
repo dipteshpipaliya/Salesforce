@@ -6,9 +6,6 @@ pipeline {
         SF_USERNAME = 'dipteshpipaliya.9e05d8f66461@agentforce.com'
         INSTANCE_URL = 'https://orgfarm-51d7ed45cf-dev-ed.develop.my.salesforce.com' 
         SCRATCH_ALIAS = 'ScratchOrg_PR'
-        
-        // This variable will store the extracted test classes
-        EXTRACTED_TESTS = ''
     }
     
     stages {
@@ -18,27 +15,25 @@ pipeline {
             }
         }
         
-      stage('Extract Tests from PR') {
+        stage('Extract Tests from PR') {
             steps {
                 script {
-                    // 1. Properly pull the payload body safely using 'def'
                     def prBody = env.PR_BODY ?: ""
                     echo "Scanning PR Description from Webhook Payload..."
                     
-                    // 2. Use a local variable to hold the extracted string
-                    def targetTests = '' // Default fallback test
+                    // Fallback test class if regex misses
+                    def targetTests = 'ContactServiceTest'
                     
-                    // Regex matches "## Apex Tests" followed by a newline and the test class names
-                    def matcher = (prBody =~ /(?i)## Apex Tests\s*\r?\n\s*([a-zA-Z0-9_,\s]+)/)
-                    
+                    // Upgraded regex: Matches "Apex Tests" followed by newline/spaces and text list
+                    def matcher = (prBody =~ /(?i)Apex\s*Tests\s*\r?\n\s*([a-zA-Z0-9_,\s]+)/)
                     if (matcher.find()) {
-                        targetTests = matcher[0][1].trim().replaceAll("\\s+", "")
+                        targetTests = matcher[0][1].trim().replaceAll("[\\s\\r\\n]+", "")
                         echo "Found target Apex Tests in PR: ${targetTests}"
                     } else {
                         echo "No Apex Tests declared in PR body. Using fallback: ${targetTests}"
                     }
                     
-                    // 3. Inject it into the environment scope safely so the next stage can see it
+                    // Injecting safely into pipeline environment mapping
                     env.RUN_THESE_TESTS = targetTests
                 }
             }
@@ -48,11 +43,8 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'sf-jwt-key', variable: 'TEMP_JWT_KEY')]) {
                     script {
-                        // Windows uses 'copy' instead of 'cp'
-                        // Enclosing variables in quotes handles spaces in Windows paths safely
+                        // Safe clean file copying syntax for Windows environments
                         bat 'copy "%TEMP_JWT_KEY%" .\\server.key'
-                        
-                        // Execute Salesforce login using Windows batch syntax
                         bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default-dev-hub'
                     }
                 }
@@ -67,7 +59,8 @@ pipeline {
 
         stage('Deploy & Test to Scratch Org') {
             steps {
-                bat 'sf project deploy start --test-level RunSpecifiedTests --tests "%EXTRACTED_TESTS%"'
+                // Reading environment mapping using Windows variable conventions
+                bat 'sf project deploy start --test-level RunSpecifiedTests --tests "%RUN_THESE_TESTS%"'
             }
         }
     }
@@ -75,7 +68,7 @@ pipeline {
     post {
         always {
             script {
-                // Windows uses 'del' instead of 'rm -f'
+                // Ensure transient authentication file cleanup occurs properly
                 bat 'if exist .\\server.key del /f /q .\\server.key'
             }
         }
