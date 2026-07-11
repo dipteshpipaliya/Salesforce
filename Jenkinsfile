@@ -9,12 +9,23 @@ pipeline {
     }
     
     stages {
-        stage('Checkout Code') {
+
+        stage('Checkout Code & PR Refs') {
             steps {
-                checkout scm
+                script {
+                    // Standard checkout first
+                    checkout scm
+                    
+                    echo "Configuring Git to see open Pull Requests..."
+                    // 1. Manually tell the local Git workspace to look for GitHub Pull Requests
+                    bat 'git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"'
+                    bat 'git config --add remote.origin.fetch "+refs/pull/*:refs/remotes/origin/pr/*"'
+                    
+                    echo "Fetching latest changes from GitHub..."
+                    bat 'git fetch origin'
+                }
             }
         }
-        
  stage('Extract Tests from PR') {
             steps {
                 script {
