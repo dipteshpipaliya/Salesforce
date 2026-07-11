@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+    
+    environment {
+        // Replace with your Salesforce Connected App Consumer Key
+        CLIENT_ID = '3MVG9HtWXcDGV.nF1F54zosIcUnMSWJp9xSdbqaBrNGYZubtCWhH01rXAU9ONF8VDPG3OnegbyleaujfT2YER'
+        // Replace with your Salesforce deployment user email
+        SF_USERNAME = 'orgfarm-51d7ed45cf-dev-ed.develop.my.salesforce.com'
+        // Use https://test.salesforce.com for Sandbox, login.salesforce.com for Prod
+        INSTANCE_URL = 'https://test.salesforce.com' 
+    }
+    
+    stages {
+        stage('Checkout Code') {
+            steps {
+                // This checks out your Git repository files onto the Jenkins server
+                checkout scm
+            }
+        }
+        
+        stage('Authorize Salesforce') {
+            steps {
+                // Retrieves the secret server.key file you uploaded to Jenkins Credentials
+                withCredentials([file(credentialsId: 'salesforce-jwt-key', variable: 'JWT_KEY_FILE')]) {
+                    sh '''
+                        sf org login jwt \
+                            --client-id ${CLIENT_ID} \
+                            --jwt-key-file ${JWT_KEY_FILE} \
+                            --username ${SF_USERNAME} \
+                            --instance-url ${INSTANCE_URL} \
+                            --set-default
+                    '''
+                }
+            }
+        }
+        
+        stage('Deploy to Salesforce') {
+            steps {
+                // Deploys the metadata source code to your target Salesforce Org
+                sh 'sf project deploy start'
+            }
+        }
+    }
+}
