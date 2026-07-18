@@ -26,9 +26,8 @@ pipeline {
                     bat 'if exist changed-sources rmdir /s /q changed-sources'
                     bat 'mkdir changed-sources'
                     
-                    // Direct target evaluation based on whether it is an open PR or main branch
                     if (env.CHANGE_ID) {
-                        echo "Validating Pull Request! Analyzing changes against origin/main..."
+                        echo "Processing Delta for Pull Request Validation..."
                         
                         // Parse commit text for target test names
                         def commitLog = bat(script: '@echo off\ngit log origin/main..HEAD --pretty=%%B', returnStdout: true).trim()
@@ -40,14 +39,16 @@ pipeline {
                             env.SF_TEST_FLAGS = "--test-level NoTestRun"
                         }
                         
-                        // Build validation package comparison
+                        // Build validation package comparison (from main to PR HEAD)
                         bat 'sfdx sgd:gen --to HEAD --from origin/main --output changed-sources/ --source force-app/'
                         env.SF_EXECUTION_MODE = "VALIDATE"
-                    } else {
-                        echo "Executing Main Merge Deployment! Processing full package rules..."
                         
-                        // When merged into main, deploy the full target package with regular test strategies
+                    } else {
+                        echo "Processing Delta for Main Merge Deployment..."
                         env.SF_TEST_FLAGS = "--test-level NoTestRun" 
+                        
+                        // FIXED: Generate delta manifest for the merge event (comparing last commit against prior state)
+                        bat 'sfdx sgd:gen --to HEAD --from HEAD~1 --output changed-sources/ --source force-app/'
                         env.SF_EXECUTION_MODE = "DEPLOY"
                     }
                     
@@ -61,8 +62,9 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'salesforce-jwt-key', variable: 'TEMP_JWT_KEY')]) {
                     script {
+                        bat 'if exist .\\server.key del /f /q .\\server.key'
                         bat 'copy "%TEMP_JWT_KEY%" .\\server.key'
-                        bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default'
+                        bat 'sf org login jwt --client-id "%CLIENT_ID%" --jwt-key-file .\\server.key --username "%SF_USERNAME%" --instance-url "%INSTANCE_URL%" --set-default --no-prompt'
                         bat 'sf config set org-capitalize-record-types=true'
                     }
                 }
@@ -72,22 +74,22 @@ pipeline {
         stage('Execute Salesforce Action') {
             steps {
                 script {
+                    // FIXED: Both validation and deployment now use the delta package manifest
                     if (env.SF_EXECUTION_MODE == "VALIDATE") {
-                        echo "Running PR Check: Delta Validation (--dry-run mode)"
+                        echo "Running PR Check: Delta Validation Check (--dry-run mode)"
                         bat 'sf project deploy start --manifest changed-sources/package/package.xml %SF_TEST_FLAGS% --dry-run'
                     } else {
-                        echo "Running Merge Action: Full Deploy to Sandbox Org"
-                        bat 'sf project deploy start --source-dir force-app/ %SF_TEST_FLAGS%'
+                        echo "Running Merge Action: Deploying Delta Changes Natively to Org"
+                        bat 'sf project deploy start --manifest changed-sources/package/package.xml %SF_TEST_FLAGS%'
                     }
                 }
             }
         }
-    } // <-- FIXED: Added this missing brace to properly close the 'stages' block
+    }
 
     post {
         always {
             script {
-                // Safely wipe transient secrets and delta package definitions
                 echo "Cleaning up workspace keys and dynamic manifests..."
                 bat 'if exist .\\server.key del /f /q .\\server.key'
                 bat 'if exist .\\changed-sources rmdir /s /q .\\changed-sources'
