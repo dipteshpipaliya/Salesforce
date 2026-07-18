@@ -48,8 +48,7 @@ pipeline {
                         env.SF_TEST_FLAGS = "--test-level NoTestRun" 
                         
                         // FIXED: Generate delta manifest for the merge event (comparing last commit against prior state)
-                        bat 'sfdx sgd:gen --to HEAD --from HEAD~1 --output changed-sources/ --source force-app/'
-                        env.SF_EXECUTION_MODE = "DEPLOY"
+bat 'sf sgd gen --to HEAD --from HEAD~1 --output changed-sources/ --source force-app/'                        env.SF_EXECUTION_MODE = "DEPLOY"
                     }
                     
                     echo "--- MANIFEST CONTENT ---"
