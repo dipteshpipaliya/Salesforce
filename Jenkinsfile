@@ -22,7 +22,6 @@ pipeline {
             steps {
                 script {
                     echo "Checking/Installing sfdx-git-delta plugin..."
-                    // Uses conditional check logic to avoid reinstalling if it already exists
                     bat 'sf plugins inspect sfdx-git-delta >nul 2>&1 || sf plugins install sfdx-git-delta --no-prompt'
 
                     echo "Generating Delta deployment payload based on Git history..."
@@ -32,7 +31,6 @@ pipeline {
                     if (env.CHANGE_ID) {
                         echo "Processing Delta for Pull Request Validation..."
                         
-                        // FIX: Combined into a single, clean batch command chain execution string
                         def commitLog = bat(script: '@echo off\ngit log origin/main..HEAD --pretty=format:%%B', returnStdout: true).trim()
                         def targetTests = parseApexTests(commitLog)
                         
@@ -42,14 +40,16 @@ pipeline {
                             env.SF_TEST_FLAGS = "--test-level NoTestRun"
                         }
                         
-                        bat 'sf sgd source delta --to HEAD --from origin/main --output-dir changed-sources/'
+                        // FIX: Added -s force-app so SGD finds the matching -meta.xml files
+                        bat 'sf sgd source delta --to HEAD --from origin/main --output-dir changed-sources/ -s force-app'
                         env.SF_EXECUTION_MODE = "VALIDATE"
                         
                     } else {
                         echo "Processing Delta for Main Merge Deployment..."
                         env.SF_TEST_FLAGS = "--test-level NoTestRun" 
                         
-                        bat 'sf sgd source delta --to HEAD --from HEAD~1 --output-dir changed-sources/' 
+                        // FIX: Added -s force-app so SGD finds the matching -meta.xml files
+                        bat 'sf sgd source delta --to HEAD --from HEAD~1 --output-dir changed-sources/ -s force-app' 
                         env.SF_EXECUTION_MODE = "DEPLOY"
                     }
                     
