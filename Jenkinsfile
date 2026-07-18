@@ -84,12 +84,21 @@ pipeline {
         }
     }
     
-    post {
+   post {
         always {
             script {
+                // Wipe transient secrets and delta package definitions
                 bat 'if exist .\\server.key del /f /q .\\server.key'
                 bat 'if exist .\\changed-sources rmdir /s /q .\\changed-sources'
             }
+        }
+        success {
+            // Automatically marks the GitHub PR Status check as green/successful
+            githubNotify context: 'Jenkins PR Validator', description: 'Delta deployment validation passed!', status: 'SUCCESS'
+        }
+        failure {
+            // Automatically marks the GitHub PR Status check as red/failed
+            githubNotify context: 'Jenkins PR Validator', description: 'Validation failed. Check Jenkins logs.', status: 'FAILURE'
         }
     }
 }
