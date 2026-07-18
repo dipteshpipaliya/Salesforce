@@ -82,9 +82,9 @@ pipeline {
                 }
             }
         }
-    }
-    
- post {
+    } // <-- FIXED: Added this missing brace to properly close the 'stages' block
+
+    post {
         always {
             script {
                 // Safely wipe transient secrets and delta package definitions
@@ -94,6 +94,7 @@ pipeline {
             }
         }
     }
+}
 
 @NonCPS
 def parseApexTests(String commitLog) {
