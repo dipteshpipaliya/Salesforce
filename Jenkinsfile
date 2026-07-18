@@ -39,16 +39,17 @@ pipeline {
                             env.SF_TEST_FLAGS = "--test-level NoTestRun"
                         }
                         
-                        // Build validation package comparison (from main to PR HEAD)
-                        bat 'sfdx sgd:gen --to HEAD --from origin/main --output changed-sources/ --source force-app/'
+                        // Build validation package comparison (from main to PR HEAD) using modern syntax
+                        bat 'sf sgd gen --to HEAD --from origin/main --output changed-sources/ --source force-app/'
                         env.SF_EXECUTION_MODE = "VALIDATE"
                         
                     } else {
                         echo "Processing Delta for Main Merge Deployment..."
                         env.SF_TEST_FLAGS = "--test-level NoTestRun" 
                         
-                        // FIXED: Generate delta manifest for the merge event (comparing last commit against prior state)
-bat 'sf sgd gen --to HEAD --from HEAD~1 --output changed-sources/ --source force-app/'                        env.SF_EXECUTION_MODE = "DEPLOY"
+                        // FIXED: Broken line layout split cleanly into structured commands
+                        bat 'sf sgd gen --to HEAD --from HEAD~1 --output changed-sources/ --source force-app/' 
+                        env.SF_EXECUTION_MODE = "DEPLOY"
                     }
                     
                     echo "--- MANIFEST CONTENT ---"
@@ -73,7 +74,6 @@ bat 'sf sgd gen --to HEAD --from HEAD~1 --output changed-sources/ --source force
         stage('Execute Salesforce Action') {
             steps {
                 script {
-                    // FIXED: Both validation and deployment now use the delta package manifest
                     if (env.SF_EXECUTION_MODE == "VALIDATE") {
                         echo "Running PR Check: Delta Validation Check (--dry-run mode)"
                         bat 'sf project deploy start --manifest changed-sources/package/package.xml %SF_TEST_FLAGS% --dry-run'
